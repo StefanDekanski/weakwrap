@@ -48,10 +48,7 @@ public class WeakWrapProcessor extends AbstractProcessor {
         try {
             for (Element e : elements) {
                 TypeElement typeElement = (TypeElement) e;
-                String className = typeElement.getSimpleName().toString();
-                String fullName = typeElement.getQualifiedName().toString();
-                String packageName = fullName.substring(0, fullName.length() - className.length() - 1);
-                WeakWrapWriter weakWrapWriter = new WeakWrapWriter(packageName, className);
+                WeakWrapWriter weakWrapWriter = new WeakWrapWriter(typeElement);
                 weakWrapWriter.writeWeakWrapperTo(filer);
                 processed = true;
             }
@@ -60,5 +57,8 @@ public class WeakWrapProcessor extends AbstractProcessor {
         }
         return processed;
     }
+
+
+
 
 }

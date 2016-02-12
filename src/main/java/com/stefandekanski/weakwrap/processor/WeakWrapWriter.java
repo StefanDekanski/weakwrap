@@ -1,81 +1,60 @@
 package com.stefandekanski.weakwrap.processor;
 
-import com.google.common.base.Preconditions;
+import com.google.common.base.Joiner;
 import com.squareup.javapoet.*;
 
 import javax.annotation.processing.Filer;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
+//TODO convert to builder, add configurable options
 public class WeakWrapWriter {
     public static final String PREFIX = "WeakWrap";
     public static final String FIELD_NAME = "weakWrap";
 
+    private final String originalClassName;
     private final String wrapClassName;
     private final String packageName;
 
-    private final MethodSpec constructor;
-    private final FieldSpec weakWrapField;
+    private final TypeElement typeElement;
 
-    public WeakWrapWriter(String originalClassName) {
-        this("", originalClassName);
-    }
-
-    public WeakWrapWriter(String packageName, String originalClassName) {
-        Preconditions.checkArgument(packageName != null && originalClassName != null);
+    public WeakWrapWriter(TypeElement typeElement) {
+        this.typeElement = typeElement;
+        this.originalClassName = typeElement.getSimpleName().toString();
         this.wrapClassName = PREFIX + originalClassName;
-        this.packageName = packageName;
-        this.constructor = createConstructor(originalClassName);
-        this.weakWrapField = createWeakWrapField(originalClassName);
-    }
-
-    public String getWrapClassName() {
-        return wrapClassName;
-    }
-
-    public String getPackageName() {
-        return packageName;
-    }
-
-    public MethodSpec getConstructor() {
-        return constructor;
-    }
-
-    public FieldSpec getWeakWrapField() {
-        return weakWrapField;
+        this.packageName = extractPackageName(typeElement.getQualifiedName(), typeElement.getSimpleName());
     }
 
     public void writeWeakWrapperTo(Filer filer) throws IOException {
-        TypeSpec weakWrapped = TypeSpec.classBuilder(wrapClassName)
+        MethodSpec constructor = createConstructor(originalClassName);
+        FieldSpec weakWrapField = createWeakWrapField(originalClassName);
+        List<MethodSpec> wrappedMethods = createWrappedMethods(typeElement);
+
+        TypeSpec wrappedType = TypeSpec.classBuilder(wrapClassName)
                 .addModifiers(Modifier.PUBLIC)
                 .addMethod(constructor)
                 .addField(weakWrapField)
-                .build();
-        JavaFile.builder(packageName, weakWrapped).build().writeTo(filer);
+                .addMethods(wrappedMethods).build();
+
+        JavaFile.builder(packageName, wrappedType).build().writeTo(filer);
     }
 
+    private static String extractPackageName(Name fullName, Name className) {
+        String fullNameString = fullName.toString();
+        return fullNameString.substring(0, fullName.length() - className.length() - 1);
+    }
 
-    public void addMethod(ExecutableElement executableElement) {
-        Set<Modifier> modifiers = executableElement.getModifiers();
-        TypeMirror returnType = executableElement.getReturnType();
-        List<ParameterSpec> parameterSpecs = getParametersSpecs(executableElement.getParameters());
-        String methodName = executableElement.getSimpleName().toString();
-
-        MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
-                .addModifiers(modifiers)
-                .returns(TypeName.get(returnType))
-                .addParameters(parameterSpecs);
-
-        for (ParameterSpec p : parameterSpecs) {
-
+    private List<MethodSpec> createWrappedMethods(TypeElement typeElement) {
+        LinkedList<MethodSpec> wrappedMethods = new LinkedList<>();
+        for (ExecutableElement method : getMethodList(typeElement)) {
+            wrappedMethods.add(wrapMethod(method));
         }
+        return wrappedMethods;
     }
 
     private MethodSpec createConstructor(String originalClassName) {
@@ -94,16 +73,85 @@ public class WeakWrapWriter {
         return FieldSpec.builder(fieldType, WeakWrapWriter.FIELD_NAME, Modifier.PRIVATE, Modifier.FINAL).build();
     }
 
-    private List<ParameterSpec> getParametersSpecs(List<? extends VariableElement> methodParams) {
-        List<ParameterSpec> parameterSpecs = new ArrayList<>(methodParams.size());
-        for (VariableElement v : methodParams) {
-            parameterSpecs.add(
-                    ParameterSpec.builder(
-                            TypeName.get(v.asType()),
-                            v.getSimpleName().toString()
-                    ).build());
+    private List<? extends ExecutableElement> getMethodList(TypeElement typeElement) {
+        LinkedList<ExecutableElement> methods = new LinkedList<>();
+        for (Element e : typeElement.getEnclosedElements()) {
+            if (e.getKind().equals(ElementKind.METHOD)) {
+                ExecutableElement method = (ExecutableElement) e;
+                if (validWrapMethod(method)) {
+                    methods.add(method);
+                }
+            }
         }
-        return parameterSpecs;
+        return methods;
     }
 
+    private boolean validWrapMethod(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        if (modifiers.contains(Modifier.PRIVATE) || modifiers.contains(Modifier.STATIC)) {
+            return false;
+        }
+        return true;
+    }
+
+    private MethodSpec wrapMethod(ExecutableElement method) {
+        String methodName = method.getSimpleName().toString();
+        MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName);
+
+        Set<Modifier> modifiers = method.getModifiers();
+        modifiers = new LinkedHashSet<>(modifiers);
+        modifiers.remove(Modifier.ABSTRACT);
+        modifiers.remove(Modifier.FINAL);
+        methodBuilder.addModifiers(modifiers);
+
+        for (TypeParameterElement typeParameterElement : method.getTypeParameters()) {
+            TypeVariable var = (TypeVariable) typeParameterElement.asType();
+            methodBuilder.addTypeVariable(TypeVariableName.get(var));
+        }
+
+        TypeMirror returnType = method.getReturnType();
+        methodBuilder.returns(TypeName.get(returnType));
+
+        List<? extends VariableElement> parameters = method.getParameters();
+        List<String> paramNames = new ArrayList<>(parameters.size());
+        for (VariableElement parameter : parameters) {
+            TypeName type = TypeName.get(parameter.asType());
+            String name = parameter.getSimpleName().toString();
+            paramNames.add(name);
+            Set<Modifier> parameterModifiers = parameter.getModifiers();
+            ParameterSpec.Builder parameterBuilder = ParameterSpec.builder(type, name)
+                    .addModifiers(parameterModifiers.toArray(new Modifier[parameterModifiers.size()]));
+            methodBuilder.addParameter(parameterBuilder.build());
+        }
+        methodBuilder.varargs(method.isVarArgs());
+
+        for (TypeMirror thrownType : method.getThrownTypes()) {
+            methodBuilder.addException(TypeName.get(thrownType));
+        }
+
+        boolean returnNeeded = true;
+        if (returnType.getKind().equals(TypeKind.VOID)) {
+            returnNeeded = false;
+        }
+
+        methodBuilder
+                .addStatement(originalClassName + " original = " + FIELD_NAME + ".get()")
+                .beginControlFlow("if(original != null)");
+        String optReturn = returnNeeded ? "return" : "";
+        methodBuilder.addStatement(optReturn + " original." + methodName + "(" + Joiner.on(',').join(paramNames) + ")");
+        methodBuilder.endControlFlow();
+
+        if (returnNeeded) {
+            if (returnType.getKind().isPrimitive()) {
+                if (returnType.getKind().equals(TypeKind.BOOLEAN)) {
+                    methodBuilder.addStatement("return false");
+                } else {
+                    methodBuilder.addStatement("return 0");
+                }
+            } else {
+                methodBuilder.addStatement("return null");
+            }
+        }
+        return methodBuilder.build();
+    }
 }
