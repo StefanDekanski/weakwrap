@@ -1,4 +1,6 @@
-# Weak Wrap
+Weak Wrap
+=========
+
 Tiny WeakReference wrapper, for Android and Java. Generates the usual (repetitive) code for working with WeakReferences.
 
 Generates tiny WeakWrap<ClassName> class with typical boilerplate code check.
