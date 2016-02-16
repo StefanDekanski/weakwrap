@@ -65,6 +65,8 @@ public class WeakWrapAddBookContractView {
 Usage
 --------
 
+Gradle:
+
 ```groovy
 allprojects {
     repositories {
