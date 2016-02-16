@@ -39,9 +39,9 @@ public class WeakWrapWriter {
     }
 
     public void writeWeakWrapperTo(Filer filer) throws IOException {
-        MethodSpec constructor = createConstructor(originalClassName);
-        FieldSpec weakWrapField = createWeakWrapField(originalClassName);
-        List<MethodSpec> wrappedMethods = createWrappedMethods(typeElement);
+        MethodSpec constructor = createConstructor();
+        FieldSpec weakWrapField = createWeakWrapField();
+        List<MethodSpec> wrappedMethods = createWrappedMethods();
 
         TypeSpec wrappedType = TypeSpec.classBuilder(wrapClassName)
                 .addModifiers(Modifier.PUBLIC)
@@ -50,23 +50,6 @@ public class WeakWrapWriter {
                 .addMethods(wrappedMethods).build();
 
         JavaFile.builder(packageName, wrappedType).build().writeTo(filer);
-    }
-
-    private static String extractClassName(String packageName, TypeElement typeElement) {
-        String fullClassName = typeElement.getQualifiedName().toString();
-        if (packageName.length() == 0) {
-            return fullClassName;
-        }
-        return fullClassName.substring(packageName.length() + 1);
-    }
-
-    private static String extractPackageName(TypeElement typeElement) {
-        TypeElement currentElement = typeElement;
-        while (currentElement.getNestingKind().isNested()) {
-            currentElement = (TypeElement) typeElement.getEnclosingElement();
-        }
-        Element packageElem = currentElement.getEnclosingElement();
-        return packageElem.getSimpleName().toString();
     }
 
     private static void checkIsValidElement(TypeElement typeElement) throws WeakWriterValidationException {
@@ -81,7 +64,24 @@ public class WeakWrapWriter {
         }
     }
 
-    private List<MethodSpec> createWrappedMethods(TypeElement typeElement) {
+    private static String extractPackageName(TypeElement typeElement) {
+        TypeElement currentElement = typeElement;
+        while (currentElement.getNestingKind().isNested()) {
+            currentElement = (TypeElement) typeElement.getEnclosingElement();
+        }
+        PackageElement packageElem = (PackageElement) currentElement.getEnclosingElement();
+        return packageElem.getQualifiedName().toString();
+    }
+
+    private static String extractClassName(String packageName, TypeElement typeElement) {
+        String fullClassName = typeElement.getQualifiedName().toString();
+        if (packageName.length() == 0) {
+            return fullClassName;
+        }
+        return fullClassName.substring(packageName.length() + 1);
+    }
+
+    private List<MethodSpec> createWrappedMethods() {
         LinkedList<MethodSpec> wrappedMethods = new LinkedList<>();
         for (ExecutableElement method : getMethodList(typeElement)) {
             wrappedMethods.add(wrapMethod(method));
@@ -89,20 +89,34 @@ public class WeakWrapWriter {
         return wrappedMethods;
     }
 
-    private MethodSpec createConstructor(String originalClassName) {
-        String lowerCaseOriginalClassName = originalClassName.toLowerCase().replaceAll("\\.", "");
+    private MethodSpec createConstructor() {
+        String varName = firstSmallLetterWithoutDots(originalClassName);
         return MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
-                .addParameter(
-                        ClassName.get(packageName, originalClassName),
-                        lowerCaseOriginalClassName)
-                .addStatement(WEAK_REFERENCE_FIELD_NAME + " = new $T<>(" + lowerCaseOriginalClassName + ")", WeakReference.class)
+                .addParameter(fullOriginalClassName(), varName)
+                .addStatement(WEAK_REFERENCE_FIELD_NAME + " = new $T<>(" + varName + ")", WeakReference.class)
                 .build();
     }
 
-    private FieldSpec createWeakWrapField(String originalClassName) {
-        ParameterizedTypeName fieldType = ParameterizedTypeName.get(ClassName.get(WeakReference.class), ClassName.get(packageName, originalClassName));
+    private String firstSmallLetterWithoutDots(String string) {
+        StringBuilder convertedString = new StringBuilder(string.length());
+        convertedString.append(Character.toLowerCase(string.charAt(0)));
+        for (int i = 1; i < string.length(); i++) {
+            char ch = string.charAt(i);
+            if (ch == '.') continue;
+            convertedString.append(ch);
+        }
+        return convertedString.toString();
+    }
+
+
+    private FieldSpec createWeakWrapField() {
+        ParameterizedTypeName fieldType = ParameterizedTypeName.get(ClassName.get(WeakReference.class), fullOriginalClassName());
         return FieldSpec.builder(fieldType, WeakWrapWriter.WEAK_REFERENCE_FIELD_NAME, Modifier.PRIVATE, Modifier.FINAL).build();
+    }
+
+    private ClassName fullOriginalClassName() {
+        return ClassName.get(packageName, originalClassName);
     }
 
     private List<? extends ExecutableElement> getMethodList(TypeElement typeElement) {
@@ -203,7 +217,6 @@ public class WeakWrapWriter {
         return originalClassName + " " + LOCAL_VAR_NAME + " = " + WEAK_REFERENCE_FIELD_NAME + ".get()";
     }
 
-
     private String ifLocalVarIsNotNull() {
         return "if(" + LOCAL_VAR_NAME + " != null)";
     }
@@ -244,7 +257,6 @@ public class WeakWrapWriter {
             methodParamNames.add(name);
         }
         return methodParamNames;
-
     }
 
     private String executeOriginalMethod(boolean isReturnNeeded, String originalMethodName, Iterable<String> originalParamNames) {

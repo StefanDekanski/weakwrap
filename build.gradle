@@ -1,7 +1,7 @@
 import org.gradle.internal.jvm.Jvm
 
 group 'com.stefandekanski'
-version '0.1-SNAPSHOT'
+version '1.0.0-SNAPSHOT'
 
 apply plugin: 'java'
 
@@ -22,3 +22,4 @@ dependencies {
     testCompile 'com.google.truth:truth:0.28'
     testCompile files(Jvm.current().getToolsJar())
 }
+
