@@ -8,10 +8,10 @@ Generates tiny WeakWrap<ClassName> class with typical boilerplate code check.
 WeakReference.get() != null 
 ``` 
 
-* Mark class or interface with @WeakWrap annotation and annotation processor will generate boilderplate code for you.
+* Mark class or interface with ```@WeakWrap``` annotation and annotation processor will generate boilderplate code for you.
 * Tiny wrapper delegates the call to the wrapped class and returns the result.
 * If ```WeakReference is null``` skips the call and returns default value. 
-* Default values are 0 and false (boolean) for primitive types and null for reference types. 
+* Default values are ```0``` and ```false``` (boolean) for primitive types and ```null``` for reference types. 
 
 __Example:__
 
