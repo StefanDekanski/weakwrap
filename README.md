@@ -68,6 +68,7 @@ Usage
 Gradle:
 
 ```groovy
+
 allprojects {
     repositories {
         jcenter()
@@ -75,7 +76,6 @@ allprojects {
         maven { url "https://jitpack.io" }
     }
 }
-
 
 buildscript {
   dependencies {
