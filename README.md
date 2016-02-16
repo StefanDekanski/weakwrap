@@ -66,6 +66,15 @@ Usage
 --------
 
 ```groovy
+allprojects {
+    repositories {
+        jcenter()
+        //add jitpack.io
+        maven { url "https://jitpack.io" }
+    }
+}
+
+
 buildscript {
   dependencies {
     classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
@@ -73,7 +82,10 @@ buildscript {
 }
 
 android{
-
+    packagingOptions {
+        exclude 'META-INF/services/javax.annotation.processing.Processor'
+    }
+}
 
 apply plugin: 'com.neenbedankt.android-apt'
 
