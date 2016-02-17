@@ -33,36 +33,6 @@ public class WeakWrapProcessorTest {
         assertThat(supportedAnnotationTypes, hasItem(WeakWrap.class.getCanonicalName()));
     }
 
-
-    @Test
-    public void testDeepPackage() {
-        JavaFileObject source = JavaFileObjects.forSourceString("com.very.deep.something.SomeInterface", Joiner.on('\n').join(
-                "package com.very.deep.something;",
-                "import com.stefandekanski.weakwrap.anotation.WeakWrap;",
-                "public interface SomeInterface {",
-                "    @WeakWrap",
-                "    interface View {",
-                "    }",
-                "}"
-        ));
-
-        JavaFileObject expectedSource = JavaFileObjects.forSourceString("com.very.deep.something.WeakWrapSomeInterfaceView", Joiner.on('\n').join(
-                "package com.very.deep.something;",
-                "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSomeInterfaceView {",
-                "    private final WeakReference<SomeInterface.View> weakWrap;",
-                "    public WeakWrapSomeInterfaceView(SomeInterface.View someInterfaceView) {",
-                "        weakWrap = new WeakReference<>(someInterfaceView);",
-                "    }",
-                "}"));
-
-        assertAbout(javaSource()).that(source)
-                .processedWith(weakWrapProcessor)
-                .compilesWithoutError()
-                .and()
-                .generatesSources(expectedSource);
-    }
-
     @Test
     public void testAnnotationOnMethod() {
         JavaFileObject source = JavaFileObjects.forSourceString("test.AnnotationOnMethod", Joiner.on('\n').join(
@@ -91,6 +61,35 @@ public class WeakWrapProcessorTest {
     }
 
     @Test
+    public void testDeepPackage() {
+        JavaFileObject source = JavaFileObjects.forSourceString("com.very.deep.something.SomeInterface", Joiner.on('\n').join(
+                "package com.very.deep.something;",
+                "import com.stefandekanski.weakwrap.anotation.WeakWrap;",
+                "public interface SomeInterface {",
+                "    @WeakWrap",
+                "    interface View {",
+                "    }",
+                "}"
+        ));
+
+        JavaFileObject expectedSource = JavaFileObjects.forSourceString("com.very.deep.something.WeakWrapSomeInterfaceView", Joiner.on('\n').join(
+                "package com.very.deep.something;",
+                "import java.lang.ref.WeakReference;",
+                "public class WeakWrapSomeInterfaceView implements SomeInterface.View{",
+                "    private final WeakReference<SomeInterface.View> weakWrap;",
+                "    public WeakWrapSomeInterfaceView(SomeInterface.View someInterfaceView) {",
+                "        weakWrap = new WeakReference<>(someInterfaceView);",
+                "    }",
+                "}"));
+
+        assertAbout(javaSource()).that(source)
+                .processedWith(weakWrapProcessor)
+                .compilesWithoutError()
+                .and()
+                .generatesSources(expectedSource);
+    }
+
+    @Test
     public void testAnnotationOnNonStaticInnerClass() {
         JavaFileObject source = JavaFileObjects.forSourceString("test.AnnotationOnNonStaticInnerClass", Joiner.on('\n').join(
                 "package test;",
@@ -101,8 +100,11 @@ public class WeakWrapProcessorTest {
                 "   }",
                 "}"));
 
-        assertAbout(javaSource()).that(source).compilesWithoutError();
-        assertAbout(javaSource()).that(source).processedWith(weakWrapProcessor).failsToCompile();
+        assertAbout(javaSource())
+                .that(source)
+                .processedWith(weakWrapProcessor)
+                .failsToCompile()
+                .withErrorContaining(WeakWrapWriter.TYPE_VALIDATION_MSG);
     }
 
     @Test
@@ -115,7 +117,7 @@ public class WeakWrapProcessorTest {
 
         JavaFileObject expectedSource = JavaFileObjects.forSourceString("WeakWrapEmptyClass", Joiner.on('\n').join(
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapEmptyClass {",
+                "public class WeakWrapEmptyClass extends EmptyClass{",
                 "    private final WeakReference<EmptyClass> weakWrap;",
                 "    public WeakWrapEmptyClass(EmptyClass emptyClass) {",
                 "        weakWrap = new WeakReference<>(emptyClass);",
@@ -142,7 +144,7 @@ public class WeakWrapProcessorTest {
         JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleInterface", Joiner.on('\n').join(
                 "package test;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSimpleInterface {",
+                "public class WeakWrapSimpleInterface implements SimpleInterface{",
                 "    private final WeakReference<SimpleInterface> weakWrap;",
                 "    public WeakWrapSimpleInterface(SimpleInterface simpleInterface) {",
                 "        weakWrap = new WeakReference<>(simpleInterface);",
@@ -163,6 +165,23 @@ public class WeakWrapProcessorTest {
     }
 
     @Test
+    public void testFinalMethodModifier() {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.FinalMethod", Joiner.on('\n').join(
+                "package test;",
+                "import com.stefandekanski.weakwrap.anotation.WeakWrap;",
+                "@WeakWrap",
+                "public class FinalMethod {",
+                "   public final void someFinalMethod(){",
+                "   }",
+                "}"));
+
+        assertAbout(javaSource()).that(source)
+                .processedWith(weakWrapProcessor)
+                .failsToCompile()
+                .withErrorContaining(WeakWrapWriter.METHOD_VALIDATION_MSG);
+    }
+
+    @Test
     public void testClassModifiers() {
         JavaFileObject source = JavaFileObjects.forSourceString("test.ModifiersClass", Joiner.on('\n').join(
                 "package test;",
@@ -176,8 +195,6 @@ public class WeakWrapProcessorTest {
                 "   void defaultMethod(){",
                 "   }",
                 "   public abstract void someAbstractMethod();",
-                "   public final void someFinalMethod(){",
-                "   }",
                 "   protected void someProtectedMethod(){",
                 "   }",
                 "   protected abstract void protectedAbstractMethod();",
@@ -186,7 +203,7 @@ public class WeakWrapProcessorTest {
         JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapModifiersClass", Joiner.on('\n').join(
                 "package test;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapModifiersClass {",
+                "public class WeakWrapModifiersClass extends ModifiersClass{",
                 "    private final WeakReference<ModifiersClass> weakWrap;",
                 "    public WeakWrapPrivateStatic(ModifiersClass modifiersClass) {",
                 "        weakWrap = new WeakReference<>(modifiersClass);",
@@ -201,12 +218,6 @@ public class WeakWrapProcessorTest {
                 "       ModifiersClass original = weakWrap.get();",
                 "       if(original != null){",
                 "           original.someAbstractMethod();",
-                "       }",
-                "   }",
-                "   public void someFinalMethod(){",
-                "       ModifiersClass original = weakWrap.get();",
-                "       if(original != null){",
-                "           original.someFinalMethod();",
                 "       }",
                 "   }",
                 "   protected void someProtectedMethod(){",
@@ -247,7 +258,7 @@ public class WeakWrapProcessorTest {
                 "import java.io.IOException;",
                 "import java.lang.InterruptedException;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapClassWithMethodsThatThrowExceptions {",
+                "public class WeakWrapClassWithMethodsThatThrowExceptions extends ClassWithMethodsThatThrowExceptions{",
                 "    private final WeakReference<ClassWithMethodsThatThrowExceptions> weakWrap;",
                 "    public WeakWrapEmptyClass(ClassWithMethodsThatThrowExceptions classWithMethodsThatThrowExceptions) {",
                 "        weakWrap = new WeakReference<>(classWithMethodsThatThrowExceptions);",
@@ -285,7 +296,7 @@ public class WeakWrapProcessorTest {
         JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleClass", Joiner.on('\n').join(
                 "package test;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSimpleClass {",
+                "public class WeakWrapSimpleClass extends SimpleClass{",
                 "    private final WeakReference<SimpleClass> weakWrap;",
                 "    public WeakWrapEmptyClass(SimpleClass simpleClass) {",
                 "        weakWrap = new WeakReference<>(simpleClass);",
@@ -332,7 +343,7 @@ public class WeakWrapProcessorTest {
                 "package test;",
                 "import java.lang.Object;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapClassWithVarargs {",
+                "public class WeakWrapClassWithVarargs extends ClassWithVarargs{",
                 "    private final WeakReference<ClassWithVarargs> weakWrap;",
                 "    public WeakWrapEmptyClass(ClassWithVarargs classWithVarargs) {",
                 "        weakWrap = new WeakReference<>(classWithVarargs);",
@@ -366,20 +377,20 @@ public class WeakWrapProcessorTest {
                 "   }",
                 "}"));
 
-        JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleClassInnerClass", Joiner.on('\n').join(
+        JavaFileObject expectedClassSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleClassInnerClass", Joiner.on('\n').join(
                 "package test;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSimpleClassInnerClass {",
+                "public class WeakWrapSimpleClassInnerClass extends SimpleClass.InnerClass{",
                 "    private final WeakReference<SimpleClass.InnerClass> weakWrap;",
                 "    public WeakWrapSimpleClassInnerClass(SimpleClass.InnerClass simpleClassInnerClass) {",
                 "        weakWrap = new WeakReference<>(simpleClassInnerClass);",
                 "    }",
                 "}"));
 
-        JavaFileObject expectedSource2 = JavaFileObjects.forSourceString("test.WeakWrapSimpleClassInnerInterface", Joiner.on('\n').join(
+        JavaFileObject expectedInterfaceSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleClassInnerInterface", Joiner.on('\n').join(
                 "package test;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSimpleClassInnerInterface {",
+                "public class WeakWrapSimpleClassInnerInterface implements SimpleClass.InnerInterface{",
                 "    private final WeakReference<SimpleClass.InnerInterface> weakWrap;",
                 "    public WeakWrapSimpleClassInnerInterface(SimpleClass.InnerInterface simpleClassInnerInterface) {",
                 "        weakWrap = new WeakReference<>(simpleClassInnerInterface);",
@@ -390,7 +401,7 @@ public class WeakWrapProcessorTest {
                 .processedWith(weakWrapProcessor)
                 .compilesWithoutError()
                 .and()
-                .generatesSources(expectedSource, expectedSource2);
+                .generatesSources(expectedClassSource, expectedInterfaceSource);
     }
 
     @Test
@@ -420,7 +431,7 @@ public class WeakWrapProcessorTest {
                 "import java.lang.ref.WeakReference;",
                 "import java.util.Collection;",
                 "import java.util.List;",
-                "public class WeakWrapSimpleGenericMethods {",
+                "public class WeakWrapSimpleGenericMethods extends SimpleGenericMethods{",
                 "    private final WeakReference<SimpleGenericMethods> weakWrap;",
                 "    public WeakWrapEmptyClass(SimpleGenericMethods simpleGenericMethods) {",
                 "        weakWrap = new WeakReference<>(simpleGenericMethods);",
@@ -503,7 +514,7 @@ public class WeakWrapProcessorTest {
                 "import java.lang.Long;",
                 "import java.lang.Object;",
                 "import java.lang.ref.WeakReference;",
-                "public class WeakWrapSimplePrimitiveClass {",
+                "public class WeakWrapSimplePrimitiveClass extends SimplePrimitiveClass{",
                 "   private final WeakReference<SimplePrimitiveClass> weakWrap;",
                 "   public WeakWrapEmptyClass(SimplePrimitiveClass simplePrimitiveClass) {",
                 "        weakWrap = new WeakReference<>(simplePrimitiveClass);",

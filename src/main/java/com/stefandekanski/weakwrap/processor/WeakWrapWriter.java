@@ -14,9 +14,24 @@ import java.util.*;
 
 //TODO convert to builder, add configurable options
 public class WeakWrapWriter {
-    public static class WeakWriterValidationException extends Exception {
-        WeakWriterValidationException(String message) {
-            super(message);
+    public static final String TYPE_VALIDATION_MSG = "Only Top level and static inner classes are supported!";
+    public static final String METHOD_VALIDATION_MSG = "Can't extend class with final methods!";
+
+    public abstract static class WeakWrapValidationException extends Exception {
+        public WeakWrapValidationException(String msg) {
+            super(msg);
+        }
+    }
+
+    public static class TypeValidationException extends WeakWrapValidationException {
+        public TypeValidationException() {
+            super(TYPE_VALIDATION_MSG);
+        }
+    }
+
+    public static class MethodValidationException extends WeakWrapValidationException {
+        public MethodValidationException() {
+            super(METHOD_VALIDATION_MSG);
         }
     }
 
@@ -30,29 +45,39 @@ public class WeakWrapWriter {
 
     private final TypeElement typeElement;
 
-    public WeakWrapWriter(TypeElement typeElement) throws WeakWriterValidationException {
-        checkIsValidElement(typeElement);
+    public WeakWrapWriter(TypeElement typeElement) throws TypeValidationException {
+        checkIsValidType(typeElement);
         this.typeElement = typeElement;
         this.packageName = extractPackageName(typeElement);
         this.originalClassName = extractClassName(packageName, typeElement);
         this.wrapClassName = CLASS_NAME_PREFIX + originalClassName.replaceAll("\\.", "");
     }
 
-    public void writeWeakWrapperTo(Filer filer) throws IOException {
+    public void writeWeakWrapperTo(Filer filer) throws IOException, MethodValidationException {
         MethodSpec constructor = createConstructor();
         FieldSpec weakWrapField = createWeakWrapField();
         List<MethodSpec> wrappedMethods = createWrappedMethods();
 
-        TypeSpec wrappedType = TypeSpec.classBuilder(wrapClassName)
+        TypeSpec.Builder builder = TypeSpec.classBuilder(wrapClassName)
                 .addModifiers(Modifier.PUBLIC)
                 .addMethod(constructor)
                 .addField(weakWrapField)
-                .addMethods(wrappedMethods).build();
+                .addMethods(wrappedMethods);
 
-        JavaFile.builder(packageName, wrappedType).build().writeTo(filer);
+        if (isOriginalElementClass()) {
+            builder.superclass(fullOriginalClassName());
+        } else {
+            builder.addSuperinterface(fullOriginalClassName());
+        }
+
+        JavaFile.builder(packageName, builder.build()).build().writeTo(filer);
     }
 
-    private static void checkIsValidElement(TypeElement typeElement) throws WeakWriterValidationException {
+    private boolean isOriginalElementClass() {
+        return typeElement.getKind().isClass();
+    }
+
+    private static void checkIsValidType(TypeElement typeElement) throws TypeValidationException {
         NestingKind nestingKind = typeElement.getNestingKind();
         boolean isTopLevel = nestingKind.equals(NestingKind.TOP_LEVEL);
         boolean isMemberKind = nestingKind.equals(NestingKind.MEMBER);
@@ -60,7 +85,7 @@ public class WeakWrapWriter {
 
         //only allow topLevel and memberStatic
         if (!(isTopLevel || (isMemberKind && isStatic))) {
-            throw new WeakWriterValidationException("Only Top level and static inner classes are supported");
+            throw new TypeValidationException();
         }
     }
 
@@ -81,7 +106,7 @@ public class WeakWrapWriter {
         return fullClassName.substring(packageName.length() + 1);
     }
 
-    private List<MethodSpec> createWrappedMethods() {
+    private List<MethodSpec> createWrappedMethods() throws MethodValidationException {
         LinkedList<MethodSpec> wrappedMethods = new LinkedList<>();
         for (ExecutableElement method : getMethodList(typeElement)) {
             wrappedMethods.add(wrapMethod(method));
@@ -124,7 +149,7 @@ public class WeakWrapWriter {
         for (Element e : typeElement.getEnclosedElements()) {
             if (e.getKind().equals(ElementKind.METHOD)) {
                 ExecutableElement method = (ExecutableElement) e;
-                if (isValidWrapMethod(method)) {
+                if (notPrivateOrStatic(method)) {
                     methods.add(method);
                 }
             }
@@ -132,7 +157,7 @@ public class WeakWrapWriter {
         return methods;
     }
 
-    private boolean isValidWrapMethod(ExecutableElement method) {
+    private boolean notPrivateOrStatic(ExecutableElement method) {
         Set<Modifier> modifiers = method.getModifiers();
         if (modifiers.contains(Modifier.PRIVATE) || modifiers.contains(Modifier.STATIC)) {
             return false;
@@ -140,11 +165,18 @@ public class WeakWrapWriter {
         return true;
     }
 
-    private MethodSpec wrapMethod(ExecutableElement originalMethod) {
+    private MethodSpec wrapMethod(ExecutableElement originalMethod) throws MethodValidationException {
+        checkIfMethodIsValid(originalMethod);
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(copyMethodName(originalMethod));
         copyMethodSignature(originalMethod, methodBuilder);
         addWrappedMethodBody(originalMethod, methodBuilder);
         return methodBuilder.build();
+    }
+
+    private void checkIfMethodIsValid(ExecutableElement originalMethod) throws MethodValidationException {
+        if (originalMethod.getModifiers().contains(Modifier.FINAL)) {
+            throw new MethodValidationException();
+        }
     }
 
     private void copyMethodSignature(ExecutableElement originalMethod, MethodSpec.Builder methodBuilder) {
@@ -168,9 +200,8 @@ public class WeakWrapWriter {
 
     private Set<Modifier> copyMethodModifiers(ExecutableElement originalMethod) {
         Set<Modifier> modifiers = new LinkedHashSet<>(originalMethod.getModifiers());
-        //exclude abstract and final modifiers
+        //exclude abstract
         modifiers.remove(Modifier.ABSTRACT);
-        modifiers.remove(Modifier.FINAL);
         return modifiers;
     }
 

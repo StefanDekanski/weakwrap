@@ -44,7 +44,7 @@ public class WeakWrapProcessor extends AbstractProcessor {
                 WeakWrapWriter weakWrapWriter = new WeakWrapWriter(typeElement);
                 weakWrapWriter.writeWeakWrapperTo(filer);
             }
-        } catch (IOException | WeakWrapWriter.WeakWriterValidationException e) {
+        } catch (IOException | WeakWrapWriter.WeakWrapValidationException e) {
             messager.printMessage(Diagnostic.Kind.ERROR, e.getMessage());
         }
         return true;
