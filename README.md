@@ -9,7 +9,7 @@ WeakReference.get() != null
 ``` 
 
 * Mark class or interface with ```@WeakWrap``` annotation and annotation processor will generate boilderplate code for you.
-* Tiny wrapper delegates the call to the wrapped class and returns the result.
+* Tiny wrapper implements/extends interface/class and delegates the call to the original interface/class and returns the result.
 * If ```WeakReference is null``` skips the call and returns default value. 
 * Default values are ```0``` and ```false``` (boolean) for primitive types and ```null``` for reference types. 
 
@@ -41,7 +41,7 @@ public interface AddBookContract {
 __Will generate:__
 
 ```java
-public class WeakWrapAddBookContractView {
+public class WeakWrapAddBookContractView implements AddBookContract.View{
   private final WeakReference<AddBookContract.View> weakWrap;
 
   public WeakWrapAddBookContractView(AddBookContract.View addBookContractView) {
