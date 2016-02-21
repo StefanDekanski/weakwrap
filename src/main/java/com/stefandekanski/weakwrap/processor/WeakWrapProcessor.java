@@ -7,6 +7,7 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.util.Collections;
@@ -17,12 +18,14 @@ public class WeakWrapProcessor extends AbstractProcessor {
 
     private Filer filer;
     private Messager messager;
+    private Elements elementsUtil;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         filer = processingEnv.getFiler();
         messager = processingEnv.getMessager();
+        elementsUtil = processingEnv.getElementUtils();
     }
 
     @Override
@@ -41,7 +44,7 @@ public class WeakWrapProcessor extends AbstractProcessor {
         try {
             for (Element e : elements) {
                 TypeElement typeElement = (TypeElement) e;
-                WeakWrapWriter weakWrapWriter = new WeakWrapWriter(typeElement);
+                WeakWrapWriter weakWrapWriter = new WeakWrapWriter(typeElement,elementsUtil);
                 weakWrapWriter.writeWeakWrapperTo(filer);
             }
         } catch (IOException | WeakWrapWriter.WeakWrapValidationException e) {

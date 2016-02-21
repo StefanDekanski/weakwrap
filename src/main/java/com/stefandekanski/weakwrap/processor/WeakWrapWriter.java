@@ -8,6 +8,8 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
+import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -15,7 +17,6 @@ import java.util.*;
 //TODO convert to builder, add configurable options
 public class WeakWrapWriter {
     public static final String TYPE_VALIDATION_MSG = "Only Top level and static inner classes are supported!";
-    public static final String METHOD_VALIDATION_MSG = "Can't extend class with final methods!";
 
     public abstract static class WeakWrapValidationException extends Exception {
         public WeakWrapValidationException(String msg) {
@@ -29,12 +30,6 @@ public class WeakWrapWriter {
         }
     }
 
-    public static class MethodValidationException extends WeakWrapValidationException {
-        public MethodValidationException() {
-            super(METHOD_VALIDATION_MSG);
-        }
-    }
-
     public static final String CLASS_NAME_PREFIX = "WeakWrap";
     public static final String WEAK_REFERENCE_FIELD_NAME = "weakWrap";
     public static final String LOCAL_VAR_NAME = "original";
@@ -44,16 +39,18 @@ public class WeakWrapWriter {
     private final String packageName;
 
     private final TypeElement typeElement;
+    private final Elements elemUtil;
 
-    public WeakWrapWriter(TypeElement typeElement) throws TypeValidationException {
+    public WeakWrapWriter(TypeElement typeElement, Elements elemUtil) throws TypeValidationException {
         checkIsValidType(typeElement);
         this.typeElement = typeElement;
-        this.packageName = extractPackageName(typeElement);
+        this.elemUtil = elemUtil;
+        this.packageName = extractPackageName(elemUtil, typeElement);
         this.originalClassName = extractClassName(packageName, typeElement);
         this.wrapClassName = CLASS_NAME_PREFIX + originalClassName.replaceAll("\\.", "");
     }
 
-    public void writeWeakWrapperTo(Filer filer) throws IOException, MethodValidationException {
+    public void writeWeakWrapperTo(Filer filer) throws IOException {
         MethodSpec constructor = createConstructor();
         FieldSpec weakWrapField = createWeakWrapField();
         List<MethodSpec> wrappedMethods = createWrappedMethods();
@@ -89,13 +86,8 @@ public class WeakWrapWriter {
         }
     }
 
-    private static String extractPackageName(TypeElement typeElement) {
-        TypeElement currentElement = typeElement;
-        while (currentElement.getNestingKind().isNested()) {
-            currentElement = (TypeElement) typeElement.getEnclosingElement();
-        }
-        PackageElement packageElem = (PackageElement) currentElement.getEnclosingElement();
-        return packageElem.getQualifiedName().toString();
+    private String extractPackageName(Elements elemUtil, TypeElement typeElement) {
+        return elemUtil.getPackageOf(typeElement).getQualifiedName().toString();
     }
 
     private static String extractClassName(String packageName, TypeElement typeElement) {
@@ -106,9 +98,9 @@ public class WeakWrapWriter {
         return fullClassName.substring(packageName.length() + 1);
     }
 
-    private List<MethodSpec> createWrappedMethods() throws MethodValidationException {
+    private List<MethodSpec> createWrappedMethods() {
         LinkedList<MethodSpec> wrappedMethods = new LinkedList<>();
-        for (ExecutableElement method : getMethodList(typeElement)) {
+        for (ExecutableElement method : getMethodList()) {
             wrappedMethods.add(wrapMethod(method));
         }
         return wrappedMethods;
@@ -144,39 +136,37 @@ public class WeakWrapWriter {
         return ClassName.get(packageName, originalClassName);
     }
 
-    private List<? extends ExecutableElement> getMethodList(TypeElement typeElement) {
+    private List<? extends ExecutableElement> getMethodList() {
         LinkedList<ExecutableElement> methods = new LinkedList<>();
-        for (Element e : typeElement.getEnclosedElements()) {
-            if (e.getKind().equals(ElementKind.METHOD)) {
-                ExecutableElement method = (ExecutableElement) e;
-                if (notPrivateOrStatic(method)) {
-                    methods.add(method);
-                }
+        for (Element e : getAllMethodsSet()) {
+            ExecutableElement method = (ExecutableElement) e;
+            if (canOverride(method)) {
+                methods.add(method);
             }
         }
         return methods;
     }
 
-    private boolean notPrivateOrStatic(ExecutableElement method) {
-        Set<Modifier> modifiers = method.getModifiers();
-        if (modifiers.contains(Modifier.PRIVATE) || modifiers.contains(Modifier.STATIC)) {
-            return false;
-        }
-        return true;
+    private Set<? extends Element> getAllMethodsSet() {
+        return ElementFilter.methodsIn(new LinkedHashSet<>(elemUtil.getAllMembers(typeElement)));
     }
 
-    private MethodSpec wrapMethod(ExecutableElement originalMethod) throws MethodValidationException {
-        checkIfMethodIsValid(originalMethod);
+    private boolean canOverride(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        if (modifiers.contains(Modifier.PROTECTED)) {
+            String methodPackage = elemUtil.getPackageOf(method).getQualifiedName().toString();
+            if (!methodPackage.equals(packageName)) {
+                return false;
+            }
+        }
+        return !(modifiers.contains(Modifier.PRIVATE) || modifiers.contains(Modifier.STATIC) || modifiers.contains(Modifier.FINAL));
+    }
+
+    private MethodSpec wrapMethod(ExecutableElement originalMethod) {
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(copyMethodName(originalMethod));
         copyMethodSignature(originalMethod, methodBuilder);
         addWrappedMethodBody(originalMethod, methodBuilder);
         return methodBuilder.build();
-    }
-
-    private void checkIfMethodIsValid(ExecutableElement originalMethod) throws MethodValidationException {
-        if (originalMethod.getModifiers().contains(Modifier.FINAL)) {
-            throw new MethodValidationException();
-        }
     }
 
     private void copyMethodSignature(ExecutableElement originalMethod, MethodSpec.Builder methodBuilder) {
@@ -202,6 +192,7 @@ public class WeakWrapWriter {
         Set<Modifier> modifiers = new LinkedHashSet<>(originalMethod.getModifiers());
         //exclude abstract
         modifiers.remove(Modifier.ABSTRACT);
+        modifiers.remove(Modifier.NATIVE);
         return modifiers;
     }
 
