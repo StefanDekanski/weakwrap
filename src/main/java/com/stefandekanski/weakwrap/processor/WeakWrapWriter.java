@@ -66,15 +66,10 @@ public class WeakWrapWriter {
         } else {
             builder.addSuperinterface(fullOriginalClassName());
         }
-
         JavaFile.builder(packageName, builder.build()).build().writeTo(filer);
     }
 
-    private boolean isOriginalElementClass() {
-        return typeElement.getKind().isClass();
-    }
-
-    private static void checkIsValidType(TypeElement typeElement) throws TypeValidationException {
+    private void checkIsValidType(TypeElement typeElement) throws TypeValidationException {
         NestingKind nestingKind = typeElement.getNestingKind();
         boolean isTopLevel = nestingKind.equals(NestingKind.TOP_LEVEL);
         boolean isMemberKind = nestingKind.equals(NestingKind.MEMBER);
@@ -90,12 +85,38 @@ public class WeakWrapWriter {
         return elemUtil.getPackageOf(typeElement).getQualifiedName().toString();
     }
 
-    private static String extractClassName(String packageName, TypeElement typeElement) {
+    private String extractClassName(String packageName, TypeElement typeElement) {
         String fullClassName = typeElement.getQualifiedName().toString();
         if (packageName.length() == 0) {
             return fullClassName;
         }
         return fullClassName.substring(packageName.length() + 1);
+    }
+
+    private boolean isOriginalElementClass() {
+        return typeElement.getKind().isClass();
+    }
+
+    private MethodSpec createConstructor() {
+        String varName = firstSmallLetterWithoutDots(originalClassName);
+        return MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(fullOriginalClassName(), varName)
+                .addStatement(declareWeakReference(varName), WeakReference.class)
+                .build();
+    }
+
+    private String declareWeakReference(String varName) {
+        return WEAK_REFERENCE_FIELD_NAME + " = new $T<>(" + varName + ")";
+    }
+
+    private FieldSpec createWeakWrapField() {
+        ParameterizedTypeName fieldType = ParameterizedTypeName.get(ClassName.get(WeakReference.class), fullOriginalClassName());
+        return FieldSpec.builder(fieldType, WeakWrapWriter.WEAK_REFERENCE_FIELD_NAME, Modifier.PRIVATE, Modifier.FINAL).build();
+    }
+
+    private ClassName fullOriginalClassName() {
+        return ClassName.get(packageName, originalClassName);
     }
 
     private List<MethodSpec> createWrappedMethods() {
@@ -104,15 +125,6 @@ public class WeakWrapWriter {
             wrappedMethods.add(wrapMethod(method));
         }
         return wrappedMethods;
-    }
-
-    private MethodSpec createConstructor() {
-        String varName = firstSmallLetterWithoutDots(originalClassName);
-        return MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(fullOriginalClassName(), varName)
-                .addStatement(WEAK_REFERENCE_FIELD_NAME + " = new $T<>(" + varName + ")", WeakReference.class)
-                .build();
     }
 
     private String firstSmallLetterWithoutDots(String string) {
@@ -124,16 +136,6 @@ public class WeakWrapWriter {
             convertedString.append(ch);
         }
         return convertedString.toString();
-    }
-
-
-    private FieldSpec createWeakWrapField() {
-        ParameterizedTypeName fieldType = ParameterizedTypeName.get(ClassName.get(WeakReference.class), fullOriginalClassName());
-        return FieldSpec.builder(fieldType, WeakWrapWriter.WEAK_REFERENCE_FIELD_NAME, Modifier.PRIVATE, Modifier.FINAL).build();
-    }
-
-    private ClassName fullOriginalClassName() {
-        return ClassName.get(packageName, originalClassName);
     }
 
     private List<? extends ExecutableElement> getMethodList() {
@@ -190,7 +192,6 @@ public class WeakWrapWriter {
 
     private Set<Modifier> copyMethodModifiers(ExecutableElement originalMethod) {
         Set<Modifier> modifiers = new LinkedHashSet<>(originalMethod.getModifiers());
-        //exclude abstract
         modifiers.remove(Modifier.ABSTRACT);
         modifiers.remove(Modifier.NATIVE);
         return modifiers;
@@ -255,12 +256,10 @@ public class WeakWrapWriter {
         if (returnKind.isPrimitive()) {
             if (returnKind.equals(TypeKind.BOOLEAN)) {
                 return "return false";
-            } else {
-                return "return 0";
             }
-        } else {
-            return "return null";
+            return "return 0";
         }
+        return "return null";
     }
 
     private boolean isReturnStatementNeeded(ExecutableElement originalMethod) {
