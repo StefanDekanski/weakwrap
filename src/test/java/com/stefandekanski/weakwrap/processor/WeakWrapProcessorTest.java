@@ -83,6 +83,7 @@ public class WeakWrapProcessorTest {
                 wrapperClassStart("SomeInterface.View", true),
                 objectOverriddenMethods("SomeInterface.View"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -134,6 +135,7 @@ public class WeakWrapProcessorTest {
                 "protected Object clone(){",
                 wrapperMethodBodyAndClose("EmptyClass", "clone()", "null"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -165,6 +167,7 @@ public class WeakWrapProcessorTest {
                 "public void someMethod(){",
                 wrapperMethodBodyAndClose("SimpleInterface", "someMethod()"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -214,6 +217,7 @@ public class WeakWrapProcessorTest {
                 "protected void protectedAbstractMethod(){",
                 wrapperMethodBodyAndClose("ModifiersClass", "protectedAbstractMethod()"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -250,6 +254,7 @@ public class WeakWrapProcessorTest {
                 "public void throwMethod() throws IOException,InterruptedException{",
                 wrapperMethodBodyAndClose("ClassWithMethodsThatThrowExceptions", "throwMethod()"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -292,6 +297,7 @@ public class WeakWrapProcessorTest {
                 "public void simpleMultipleParam(int in,long lo,double dou){",
                 wrapperMethodBodyAndClose("SimpleClass", "simpleMultipleParam(in, lo, dou)"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -324,6 +330,7 @@ public class WeakWrapProcessorTest {
                 "public void varargMethod(int a,Object... objectVararg){",
                 wrapperMethodBodyAndClose("ClassWithVarargs", "varargMethod(a,objectVararg)"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -356,6 +363,7 @@ public class WeakWrapProcessorTest {
                 wrapperClassStart("SimpleClass.InnerClass", false),
                 objectOverriddenMethods("SimpleClass.InnerClass"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -367,6 +375,7 @@ public class WeakWrapProcessorTest {
                 wrapperClassStart("SimpleClass.InnerInterface", true),
                 objectOverriddenMethods("SimpleClass.InnerInterface"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -421,6 +430,7 @@ public class WeakWrapProcessorTest {
                 "public <T extends Comparable<T>> void genericMethod(T[] anArray, T elem){",
                 wrapperMethodBodyAndClose("SimpleGenericMethods", "genericMethod(anArray,elem)"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -509,6 +519,7 @@ public class WeakWrapProcessorTest {
                 "public Long simplePrimitiveWrapperMethod(){",
                 wrapperMethodBodyAndClose("SimplePrimitiveClass", "simplePrimitiveWrapperMethod()", "null"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -551,6 +562,7 @@ public class WeakWrapProcessorTest {
                 "public void someTestMethod(){",
                 wrapperMethodBodyAndClose("SomeInterface.View", "someTestMethod()"),
 
+                clearWeakWrapRefMethod(),
                 wrapperClassEnd()
         ));
 
@@ -563,7 +575,7 @@ public class WeakWrapProcessorTest {
 
 
     private static String objectOverriddenMethods(String originalName) {
-        String weakWrapGetToLocalVar = originalName + " original = weakWrap.get();";
+        String weakWrapGetToLocalVar = "    " + originalName + " original = weakWrap.get();";
         return Joiner.on('\n').join(
                 "public int hashCode() {",
                 weakWrapGetToLocalVar,
@@ -641,14 +653,22 @@ public class WeakWrapProcessorTest {
             returnStatement = "return " + returnVal + ";\n";
         }
         String method = Joiner.on('\n').join(
-                originalClass + " original = weakWrap.get();",
-                "if(original != null){",
-                returnText + "original." + methodCall + ";",
-                "}"
+                "    " + originalClass + " original = weakWrap.get();",
+                "    if(original != null){",
+                "        " + returnText + "original." + methodCall + ";",
+                "    }"
         );
         if (returnVal.length() > 0) {
             method += returnStatement;
         }
         return method + "\n}";
+    }
+
+    private static String clearWeakWrapRefMethod() {
+        return Joiner.on('\n').join(
+                "public void clearWeakWrapRef(){",
+                "    weakWrap.clear();",
+                "}"
+        );
     }
 }

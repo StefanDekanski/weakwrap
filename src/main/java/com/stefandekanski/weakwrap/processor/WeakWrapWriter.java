@@ -54,12 +54,14 @@ public class WeakWrapWriter {
         MethodSpec constructor = createConstructor();
         FieldSpec weakWrapField = createWeakWrapField();
         List<MethodSpec> wrappedMethods = createWrappedMethods();
+        MethodSpec clearWeakWrapRefMethod = clearWeakWrapRefMethod();
 
         TypeSpec.Builder builder = TypeSpec.classBuilder(wrapClassName)
                 .addModifiers(Modifier.PUBLIC)
                 .addMethod(constructor)
                 .addField(weakWrapField)
-                .addMethods(wrappedMethods);
+                .addMethods(wrappedMethods)
+                .addMethod(clearWeakWrapRefMethod);
 
         if (isOriginalElementClass()) {
             builder.superclass(fullOriginalClassName());
@@ -125,6 +127,13 @@ public class WeakWrapWriter {
             wrappedMethods.add(wrapMethod(method));
         }
         return wrappedMethods;
+    }
+
+    public MethodSpec clearWeakWrapRefMethod() {
+        MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder("clearWeakWrapRef");
+        methodBuilder.addModifiers(Modifier.PUBLIC);
+        methodBuilder.addStatement(WEAK_REFERENCE_FIELD_NAME + ".clear()");
+        return methodBuilder.build();
     }
 
     private String firstSmallLetterWithoutDots(String string) {
