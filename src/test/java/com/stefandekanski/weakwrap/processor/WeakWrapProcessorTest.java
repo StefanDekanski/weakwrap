@@ -80,11 +80,11 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SomeInterface.View", true),
+                wrapInterfaceStart("SomeInterface.View"),
                 objectOverriddenMethods("SomeInterface.View"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -129,14 +129,14 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("EmptyClass", false),
+                wrapClassStart("EmptyClass"),
                 objectOverriddenMethods("EmptyClass"),
 
                 "protected Object clone(){",
                 wrapperMethodBodyAndClose("EmptyClass", "clone()", "null"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -161,14 +161,14 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SimpleInterface", true),
+                wrapInterfaceStart("SimpleInterface"),
                 objectOverriddenMethods("SimpleInterface"),
 
                 "public void someMethod(){",
                 wrapperMethodBodyAndClose("SimpleInterface", "someMethod()"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -202,7 +202,7 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("ModifiersClass", false),
+                wrapClassStart("ModifiersClass"),
                 objectOverriddenMethods("ModifiersClass"),
 
                 "void defaultMethod(){",
@@ -218,7 +218,7 @@ public class WeakWrapProcessorTest {
                 wrapperMethodBodyAndClose("ModifiersClass", "protectedAbstractMethod()"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -248,14 +248,14 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("ClassWithMethodsThatThrowExceptions", false),
+                wrapClassStart("ClassWithMethodsThatThrowExceptions"),
                 objectOverriddenMethods("ClassWithMethodsThatThrowExceptions"),
 
                 "public void throwMethod() throws IOException,InterruptedException{",
                 wrapperMethodBodyAndClose("ClassWithMethodsThatThrowExceptions", "throwMethod()"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -285,7 +285,7 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SimpleClass", false),
+                wrapClassStart("SimpleClass"),
                 objectOverriddenMethods("SimpleClass"),
 
                 "public void simpleMethod(){",
@@ -298,7 +298,7 @@ public class WeakWrapProcessorTest {
                 wrapperMethodBodyAndClose("SimpleClass", "simpleMultipleParam(in, lo, dou)"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -324,14 +324,14 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("ClassWithVarargs", false),
+                wrapClassStart("ClassWithVarargs"),
                 objectOverriddenMethods("ClassWithVarargs"),
 
                 "public void varargMethod(int a,Object... objectVararg){",
                 wrapperMethodBodyAndClose("ClassWithVarargs", "varargMethod(a,objectVararg)"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -360,11 +360,11 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SimpleClass.InnerClass", false),
+                wrapClassStart("SimpleClass.InnerClass"),
                 objectOverriddenMethods("SimpleClass.InnerClass"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         JavaFileObject expectedInterfaceSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleClassInnerInterface", Joiner.on('\n').join(
@@ -372,11 +372,11 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SimpleClass.InnerInterface", true),
+                wrapInterfaceStart("SimpleClass.InnerInterface"),
                 objectOverriddenMethods("SimpleClass.InnerInterface"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -415,7 +415,7 @@ public class WeakWrapProcessorTest {
                 "import java.util.Collection;",
                 "import java.util.List;",
 
-                wrapperClassStart("SimpleGenericMethods", false),
+                wrapClassStart("SimpleGenericMethods"),
                 objectOverriddenMethods("SimpleGenericMethods"),
 
                 "public void simpleGenericParam(List<Long> longList){",
@@ -431,7 +431,7 @@ public class WeakWrapProcessorTest {
                 wrapperMethodBodyAndClose("SimpleGenericMethods", "genericMethod(anArray,elem)"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -486,7 +486,7 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SimplePrimitiveClass", false),
+                wrapClassStart("SimplePrimitiveClass"),
                 objectOverriddenMethods("SimplePrimitiveClass"),
 
                 "public byte primitiveByteMethod(){",
@@ -520,7 +520,7 @@ public class WeakWrapProcessorTest {
                 wrapperMethodBodyAndClose("SimplePrimitiveClass", "simplePrimitiveWrapperMethod()", "null"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSource()).that(source)
@@ -556,14 +556,14 @@ public class WeakWrapProcessorTest {
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapperClassStart("SomeInterface.View", true),
+                wrapInterfaceStart("SomeInterface.View"),
                 objectOverriddenMethods("SomeInterface.View"),
 
                 "public void someTestMethod(){",
                 wrapperMethodBodyAndClose("SomeInterface.View", "someTestMethod()"),
 
                 clearWeakWrapRefMethod(),
-                wrapperClassEnd()
+                wrapperEnd()
         ));
 
         assertAbout(javaSources()).that(Arrays.asList(source1, source2))
@@ -614,7 +614,15 @@ public class WeakWrapProcessorTest {
         return "import java.lang.ref.WeakReference;";
     }
 
-    private static String wrapperClassStart(String original, boolean isInterface) {
+    private static String wrapInterfaceStart(String original) {
+        return wrapperStart(original, true);
+    }
+
+    private static String wrapClassStart(String original) {
+        return wrapperStart(original, false);
+    }
+
+    private static String wrapperStart(String original, boolean isInterface) {
         String extendOrImpl = isInterface ? "implements" : "extends";
         String classVarName = firstSmallLetterWithoutDots(original);
         String wrapClassName = "WeakWrap" + original.replaceAll("\\.", "");
@@ -626,7 +634,7 @@ public class WeakWrapProcessorTest {
                 "}");
     }
 
-    private static String wrapperClassEnd() {
+    private static String wrapperEnd() {
         return "}";
     }
 
