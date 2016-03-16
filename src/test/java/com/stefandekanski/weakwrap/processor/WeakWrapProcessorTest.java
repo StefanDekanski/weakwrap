@@ -573,6 +573,78 @@ public class WeakWrapProcessorTest {
                 .generatesSources(expectedSource);
     }
 
+    @Test
+    public void testExtendedClassWithInterfaces() {
+        JavaFileObject sourceInterface1 = JavaFileObjects.forSourceString("com.test.SimpleInterface", Joiner.on('\n').join(
+                "package com.test;",
+                "public interface SimpleInterface {",
+                "   void someTestMethod();",
+                "}"
+        ));
+
+        JavaFileObject sourceInterface2 = JavaFileObjects.forSourceString("test.SomeInterfaceTwo", Joiner.on('\n').join(
+                "package test;",
+                "public interface SomeInterfaceTwo {",
+                "   void someTestMethodTwo();",
+                "}"
+        ));
+
+        JavaFileObject sourceClass = JavaFileObjects.forSourceString("test.SomeClassToExtend", Joiner.on('\n').join(
+                "package test;",
+                "public class SomeClassToExtend {",
+                "   void someClassMethod(){",
+                "   }",
+                "}"
+        ));
+
+        JavaFileObject sourceTest = JavaFileObjects.forSourceString("test.ClassWithInterfaces", Joiner.on('\n').join(
+                "package test;",
+                "import com.test.SimpleInterface;",
+                importWeakWrapAnnotation(),
+                "@WeakWrap",
+                "public class ClassWithInterfaces extends SomeClassToExtend implements SimpleInterface, SomeInterfaceTwo{",
+                "   void someMethod(){",
+                "   }",
+                "   public void someTestMethod(){",
+                "   }",
+                "   public void someTestMethodTwo(){",
+                "   }",
+                "}"
+        ));
+
+        JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapClassWithInterfaces", Joiner.on('\n').join(
+                "package test;",
+                "",
+                "import com.test.SimpleInterface;",
+                importObjectMethodStuff(),
+                importWeakReference(),
+
+                wrapClassWithInterfaces("ClassWithInterfaces", "SimpleInterface", "SomeInterfaceTwo"),
+                objectOverriddenMethods("ClassWithInterfaces"),
+
+                "void someClassMethod(){",
+                wrapperMethodBodyAndClose("ClassWithInterfaces", "someClassMethod()"),
+
+                "void someMethod(){",
+                wrapperMethodBodyAndClose("ClassWithInterfaces", "someMethod()"),
+
+                "public void someTestMethod(){",
+                wrapperMethodBodyAndClose("ClassWithInterfaces", "someTestMethod()"),
+
+                "public void someTestMethodTwo(){",
+                wrapperMethodBodyAndClose("ClassWithInterfaces", "someTestMethodTwo()"),
+
+                clearWeakWrapRefMethod(),
+                wrapperEnd()
+        ));
+
+        assertAbout(javaSources()).that(Arrays.asList(sourceInterface1, sourceInterface2, sourceClass, sourceTest))
+                .processedWith(weakWrapProcessor)
+                .compilesWithoutError()
+                .and()
+                .generatesSources(expectedSource);
+    }
+
 
     private static String objectOverriddenMethods(String originalName) {
         String weakWrapGetToLocalVar = "    " + originalName + " original = weakWrap.get();";
@@ -622,16 +694,23 @@ public class WeakWrapProcessorTest {
         return wrapperStart(original, false);
     }
 
-    private static String wrapperStart(String original, boolean isInterface) {
+    private static String wrapClassWithInterfaces(String original, String... interfaces) {
+        return wrapperStart(original, false, interfaces);
+    }
+
+    private static String wrapperStart(String original, boolean isInterface, String... interfaces) {
+        String extraInterfaces = interfaces.length > 0 ? "implements " + Joiner.on(",").join(interfaces) : "";
         String extendOrImpl = isInterface ? "implements" : "extends";
         String classVarName = firstSmallLetterWithoutDots(original);
         String wrapClassName = "WeakWrap" + original.replaceAll("\\.", "");
         return Joiner.on('\n').join(
-                "public class " + wrapClassName + " " + extendOrImpl + " " + original + "{",
-                "private final WeakReference<" + original + "> weakWrap;",
-                "public " + wrapClassName + "(" + original + " " + classVarName + ") {",
-                "weakWrap = new WeakReference<>(" + classVarName + ");",
-                "}");
+                "",
+                "public class " + wrapClassName + " " + extendOrImpl + " " + original + " " + extraInterfaces + "{",
+                "   private final WeakReference<" + original + "> weakWrap;",
+                "       public " + wrapClassName + "(" + original + " " + classVarName + ") {",
+                "           weakWrap = new WeakReference<>(" + classVarName + ");",
+                "   }",
+                "");
     }
 
     private static String wrapperEnd() {

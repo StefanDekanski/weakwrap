@@ -65,10 +65,20 @@ public class WeakWrapWriter {
 
         if (isOriginalElementClass()) {
             builder.superclass(fullOriginalClassName());
+            builder.addSuperinterfaces(getSuperInterfaces());
         } else {
             builder.addSuperinterface(fullOriginalClassName());
         }
+
         JavaFile.builder(packageName, builder.build()).build().writeTo(filer);
+    }
+
+    private List<? extends TypeName> getSuperInterfaces() {
+        List<TypeName> typeNames = new ArrayList<>(typeElement.getInterfaces().size());
+        for (TypeMirror mirror : typeElement.getInterfaces()) {
+            typeNames.add(TypeName.get(mirror));
+        }
+        return typeNames;
     }
 
     private void checkIsValidType(TypeElement typeElement) throws TypeValidationException {
