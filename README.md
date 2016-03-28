@@ -67,7 +67,10 @@ public class WeakWrapAddBookContractView implements AddBookContract.View{
 Usage
 --------
 
-Gradle:
+Android:
+-------
+
+build.gradle in project root
 
 ```groovy
 
@@ -84,7 +87,11 @@ buildscript {
     classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
   }
 }
+```
 
+build.gradle in /app folder
+
+```groovy
 android{
     packagingOptions {
         exclude 'META-INF/services/javax.annotation.processing.Processor'
