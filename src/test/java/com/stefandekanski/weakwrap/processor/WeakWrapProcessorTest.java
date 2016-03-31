@@ -8,6 +8,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import javax.tools.JavaFileObject;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -151,17 +152,17 @@ public class WeakWrapProcessorTest {
         JavaFileObject source = JavaFileObjects.forSourceString("test.SimpleInterface", Joiner.on('\n').join(
                 "package test;",
                 importWeakWrapAnnotation(),
-                "@WeakWrap",
+                "@WeakWrap(classNamePrefix = \"Test\")",
                 "interface SimpleInterface {",
                 "   void someMethod();",
                 "}"));
 
-        JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.WeakWrapSimpleInterface", Joiner.on('\n').join(
+        JavaFileObject expectedSource = JavaFileObjects.forSourceString("test.TestSimpleInterface", Joiner.on('\n').join(
                 "package test;",
                 importObjectMethodStuff(),
                 importWeakReference(),
 
-                wrapInterfaceStart("SimpleInterface"),
+                wrapInterfaceStart("Test", "SimpleInterface"),
                 objectOverriddenMethods("SimpleInterface"),
 
                 "public void someMethod(){",
@@ -690,6 +691,10 @@ public class WeakWrapProcessorTest {
         return wrapperStart(original, true);
     }
 
+    private static String wrapInterfaceStart(String prefix, String original) {
+        return wrapperStart(prefix, original, true);
+    }
+
     private static String wrapClassStart(String original) {
         return wrapperStart(original, false);
     }
@@ -698,11 +703,27 @@ public class WeakWrapProcessorTest {
         return wrapperStart(original, false, interfaces);
     }
 
+    private static final String DEFAULT_PREFIX = getDefaultWeakWrapPrefix();
+
+    private static String getDefaultWeakWrapPrefix() {
+        try {
+            Method method = WeakWrap.class.getMethod("classNamePrefix");
+            return (String) method.getDefaultValue();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+            throw new IllegalStateException("method name was changed without updating the name here!");
+        }
+    }
+
     private static String wrapperStart(String original, boolean isInterface, String... interfaces) {
+        return wrapperStart(DEFAULT_PREFIX, original, isInterface, interfaces);
+    }
+
+    private static String wrapperStart(String prefix, String original, boolean isInterface, String... interfaces) {
         String extraInterfaces = interfaces.length > 0 ? "implements " + Joiner.on(",").join(interfaces) : "";
         String extendOrImpl = isInterface ? "implements" : "extends";
         String classVarName = firstSmallLetterWithoutDots(original);
-        String wrapClassName = "WeakWrap" + original.replaceAll("\\.", "");
+        String wrapClassName = prefix + original.replaceAll("\\.", "");
         return Joiner.on('\n').join(
                 "",
                 "public class " + wrapClassName + " " + extendOrImpl + " " + original + " " + extraInterfaces + "{",

@@ -2,6 +2,7 @@ package com.stefandekanski.weakwrap.processor;
 
 import com.google.common.base.Joiner;
 import com.squareup.javapoet.*;
+import com.stefandekanski.weakwrap.anotation.WeakWrap;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.*;
@@ -14,7 +15,6 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.*;
 
-//TODO convert to builder, add configurable options
 public class WeakWrapWriter {
     public static final String TYPE_VALIDATION_MSG = "Only Top level and static inner classes are supported!";
 
@@ -30,7 +30,6 @@ public class WeakWrapWriter {
         }
     }
 
-    public static final String CLASS_NAME_PREFIX = "WeakWrap";
     public static final String WEAK_REFERENCE_FIELD_NAME = "weakWrap";
     public static final String LOCAL_VAR_NAME = "original";
 
@@ -47,7 +46,8 @@ public class WeakWrapWriter {
         this.elemUtil = elemUtil;
         this.packageName = extractPackageName(elemUtil, typeElement);
         this.originalClassName = extractClassName(packageName, typeElement);
-        this.wrapClassName = CLASS_NAME_PREFIX + originalClassName.replaceAll("\\.", "");
+        String classNamePrefix = typeElement.getAnnotation(WeakWrap.class).classNamePrefix();
+        this.wrapClassName = classNamePrefix + originalClassName.replaceAll("\\.", "");
     }
 
     public void writeWeakWrapperTo(Filer filer) throws IOException {
@@ -139,7 +139,7 @@ public class WeakWrapWriter {
         return wrappedMethods;
     }
 
-    public MethodSpec clearWeakWrapRefMethod() {
+    private MethodSpec clearWeakWrapRefMethod() {
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder("clearWeakWrapRef");
         methodBuilder.addModifiers(Modifier.PUBLIC);
         methodBuilder.addStatement(WEAK_REFERENCE_FIELD_NAME + ".clear()");
